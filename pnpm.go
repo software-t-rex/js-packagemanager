@@ -36,7 +36,7 @@ func getPnpmWorkspaceGlobs(rootpath string) ([]string, error) {
 	}
 
 	if len(pkgGlobs) == 0 {
-		return nil, fmt.Errorf("pnpm-workspace.yaml: no packages found. Turborepo requires pnpm workspaces and thus packages to be defined in the root pnpm-workspace.yaml")
+		return nil, fmt.Errorf("pnpm-workspace.yaml: no packages found. packagemanager requires pnpm workspaces and thus packages to be defined in the root pnpm-workspace.yaml")
 	}
 
 	filteredPkgGlobs := []string{}

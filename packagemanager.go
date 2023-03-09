@@ -19,7 +19,6 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/software-t-rex/monospace/packageJson"
-	"sigs.k8s.io/yaml"
 )
 
 // PackageManager is an abstraction across package managers
@@ -225,22 +224,6 @@ func (pm PackageManager) PrunePatchedPackages(pkgJSON *packageJson.PackageJSON, 
 // YarnRC Represents contents of .yarnrc.yml
 type YarnRC struct {
 	NodeLinker string `yaml:"nodeLinker"`
-}
-
-// IsNMLinker Checks that Yarn is set to use the node-modules linker style
-func IsNMLinker(cwd string) (bool, error) {
-	yarnRC := &YarnRC{}
-
-	bytes, err := os.ReadFile(filepath.Join(cwd, ".yarnrc.yml"))
-	if err != nil {
-		return false, fmt.Errorf(".yarnrc.yml: %w", err)
-	}
-
-	if yaml.Unmarshal(bytes, yarnRC) != nil {
-		return false, fmt.Errorf(".yarnrc.yml: %w", err)
-	}
-
-	return yarnRC.NodeLinker == "node-modules", nil
 }
 
 func FileExists(path string) bool {

@@ -3,13 +3,31 @@ package packagemanager
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/software-t-rex/monospace/packageJson"
+	"sigs.k8s.io/yaml"
 )
+
+// isNMLinker Checks that Yarn is set to use the node-modules linker style
+func isNMLinker(cwd string) (bool, error) {
+	yarnRC := &YarnRC{}
+
+	bytes, err := os.ReadFile(filepath.Join(cwd, ".yarnrc.yml"))
+	if err != nil {
+		return false, fmt.Errorf(".yarnrc.yml: %w", err)
+	}
+
+	if yaml.Unmarshal(bytes, yarnRC) != nil {
+		return false, fmt.Errorf(".yarnrc.yml: %w", err)
+	}
+
+	return yarnRC.NodeLinker == "node-modules", nil
+}
 
 var nodejsBerry = PackageManager{
 	Name:       "nodejs-berry",
@@ -25,7 +43,7 @@ var nodejsBerry = PackageManager{
 			return nil, fmt.Errorf("package.json: %w", err)
 		}
 		if len(pkg.Workspaces) == 0 {
-			return nil, fmt.Errorf("package.json: no workspaces found. Turborepo requires Yarn workspaces to be defined in the root package.json")
+			return nil, fmt.Errorf("package.json: no workspaces found. packagemanager requires Yarn workspaces to be defined in the root package.json")
 		}
 		return pkg.Workspaces, nil
 	},
@@ -41,7 +59,7 @@ var nodejsBerry = PackageManager{
 	},
 
 	canPrune: func(cwd string) (bool, error) {
-		if isNMLinker, err := IsNMLinker(cwd); err != nil {
+		if isNMLinker, err := isNMLinker(cwd); err != nil {
 			return false, errors.New("could not determine if yarn is using `nodeLinker: node-modules`: " + err.Error())
 		} else if !isNMLinker {
 			return false, errors.New("only yarn v2/v3 with `nodeLinker: node-modules` is supported at this time")
@@ -97,7 +115,7 @@ var nodejsBerry = PackageManager{
 		// We're Berry!
 
 		// Check for supported configuration.
-		isNMLinker, err := IsNMLinker(projectDirectory)
+		isNMLinker, err := isNMLinker(projectDirectory)
 
 		if err != nil {
 			// Failed to read the linker state, so we treat an unknown configuration as a failure.

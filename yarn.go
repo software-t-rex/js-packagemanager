@@ -25,7 +25,7 @@ var nodejsYarn = PackageManager{
 			return nil, fmt.Errorf("package.json: %w", err)
 		}
 		if len(pkg.Workspaces) == 0 {
-			return nil, fmt.Errorf("package.json: no workspaces found. Turborepo requires Yarn workspaces to be defined in the root package.json")
+			return nil, fmt.Errorf("package.json: no workspaces found. packagemanager requires Yarn workspaces to be defined in the root package.json")
 		}
 		return pkg.Workspaces, nil
 	},
