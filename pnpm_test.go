@@ -25,7 +25,7 @@ func getPnpmPackageJSON(t *testing.T) *packageJson.PackageJSON {
 	assert.Assert(t, filepath.IsAbs(rawCwd), rawCwd+" is not absolute path")
 	cwd := rawCwd
 	assert.NilError(t, err)
-	pkgJSONPath := filepath.Join(cwd, "fixtures", "pnpm-patches.json")
+	pkgJSONPath := filepath.Join(cwd, "testdata", "pnpm-patches.json")
 	pkgJSON, err := packageJson.Read(pkgJSONPath)
 	assert.NilError(t, err)
 	return pkgJSON

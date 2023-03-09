@@ -325,7 +325,7 @@ func Test_GetWorkspaceIgnores(t *testing.T) {
 		tests[i] = test{
 			name:     packageManager.Name,
 			pm:       packageManager,
-			rootPath: filepath.Join(cwd, "fixtures"),
+			rootPath: filepath.Join(cwd, "testdata"),
 			want:     want[packageManager.Name],
 			wantErr:  false,
 		}
@@ -380,7 +380,7 @@ func Test_CanPrune(t *testing.T) {
 		tests[i] = test{
 			name:     packageManager.Name,
 			pm:       packageManager,
-			rootPath: filepath.Join(cwd, "../../examples/with-yarn"),
+			rootPath: filepath.Join(cwd, "testdata/with-yarn"),
 			want:     wants[packageManager.Name].want,
 			wantErr:  wants[packageManager.Name].wantErr,
 		}
