@@ -1,6 +1,12 @@
 // Adapted from https://github.com/replit/upm
 // Copyright (c) 2019 Neoreason d/b/a Repl.it. All rights reserved.
 // SPDX-License-Identifier: MIT
+// By the turbo team for turborepo which is licensed the MPL v2.0 license
+// https://github.com/vercel/turbo/tree/368b715/cli/internal/packagemanager
+// This version remove any dependency on turborepo internals and refactor
+// a bit of code to make this more generic package to re-use in other application
+// As the License in the original file seems to be MIT all modification made will
+// be under the MIT license too.
 
 package packagemanager
 
@@ -115,7 +121,7 @@ func readPackageManager(pkg *packageJson.PackageJSON) (packageManager *PackageMa
 		}
 	}
 
-	return nil, fmt.Errorf("we did not find a package manager specified in your root package.json. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo")
+	return nil, fmt.Errorf("we did not find a package manager specified in your root package.json. Please set the \"packageManager\" property in your root package.json (https://nodejs.org/api/packages.html#packagemanager)")
 }
 
 // detectPackageManager attempts to detect the package manager by inspecting the project directory state.
@@ -130,11 +136,11 @@ func detectPackageManager(projectDirectory string) (packageManager *PackageManag
 		}
 	}
 
-	return nil, fmt.Errorf("we did not detect an in-use package manager for your project. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo")
+	return nil, fmt.Errorf("we did not detect an in-use package manager for your project. Please set the \"packageManager\" property in your root package.json (https://nodejs.org/api/packages.html#packagemanager)")
 }
 
-// GetWorkspaces returns the list of package.json files for the current repository.
-func (pm PackageManager) GetWorkspaces(rootpath string) ([]string, error) {
+// GetWorkspaces returns the list of package.json files for the current mono[space|repo].
+func (pm PackageManager) GetWorkspaces(rootpath string, relativePath bool) ([]string, error) {
 	globs, err := pm.getWorkspaceGlobs(rootpath)
 	if err != nil {
 		return nil, err
@@ -172,6 +178,13 @@ func (pm PackageManager) GetWorkspaces(rootpath string) ([]string, error) {
 		}
 	}
 
+	// make res fullpath
+	if !relativePath {
+		for i, path := range res {
+			res[i] = filepath.Join(rootpath, path)
+		}
+	}
+
 	return res, nil
 }
 
@@ -180,7 +193,7 @@ func (pm PackageManager) GetWorkspaceIgnores(rootpath string) ([]string, error) 
 	return pm.getWorkspaceIgnores(pm, rootpath)
 }
 
-// CanPrune returns if turbo can produce a pruned workspace. Can error if fs issues occur
+// CanPrune returns if we can produce a pruned workspace. Can error if fs issues occur
 func (pm PackageManager) CanPrune(projectDirectory string) (bool, error) {
 	if pm.canPrune != nil {
 		return pm.canPrune(projectDirectory)
@@ -276,25 +289,4 @@ func FindupFrom(name, dir string) (string, error) {
 
 		dir = parent
 	}
-}
-
-// GetCwd returns the calculated working directory after traversing symlinks.
-func GetCwd(cwdRaw string) (string, error) {
-	if cwdRaw == "" {
-		var err error
-		cwdRaw, err = os.Getwd()
-		if err != nil {
-			return "", err
-		}
-	}
-	// We evaluate symlinks here because the package managers
-	// we support do the same.
-	cwdRaw, err := filepath.EvalSymlinks(cwdRaw)
-	if err != nil {
-		return "", fmt.Errorf("evaluating symlinks in cwd: %w", err)
-	}
-	if !filepath.IsAbs(cwdRaw) {
-		return "", fmt.Errorf("cwd is not an absolute path %v: %v", cwdRaw, err)
-	}
-	return cwdRaw, nil
 }

@@ -102,10 +102,8 @@ func TestParsePackageManagerString(t *testing.T) {
 }
 
 func TestGetPackageManager(t *testing.T) {
-	cwdRaw, err := os.Getwd()
+	cwd, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := GetCwd(cwdRaw)
-	assert.NilError(t, err, "GetCwd")
 	tests := []struct {
 		name             string
 		projectDirectory string
@@ -224,53 +222,51 @@ func Test_GetWorkspaces(t *testing.T) {
 		wantErr  bool
 	}
 
-	cwd, _ := os.Getwd()
-
-	repoRoot, err := GetCwd(cwd)
-	assert.NilError(t, err, "GetCwd")
+	cwd, err := os.Getwd()
+	assert.NilError(t, err, "os.Getcwd")
 	rootPath := map[string]string{
-		"nodejs-npm":   filepath.Join(repoRoot, "../../../examples/with-yarn"),
-		"nodejs-berry": filepath.Join(repoRoot, "../../../examples/with-yarn"),
-		"nodejs-yarn":  filepath.Join(repoRoot, "../../../examples/with-yarn"),
-		"nodejs-pnpm":  filepath.Join(repoRoot, "../../../examples/basic"),
-		"nodejs-pnpm6": filepath.Join(repoRoot, "../../../examples/basic"),
+		"nodejs-npm":   filepath.Join(cwd, "../../examples/with-yarn"),
+		"nodejs-berry": filepath.Join(cwd, "../../examples/with-yarn"),
+		"nodejs-yarn":  filepath.Join(cwd, "../../examples/with-yarn"),
+		"nodejs-pnpm":  filepath.Join(cwd, "../../examples/basic"),
+		"nodejs-pnpm6": filepath.Join(cwd, "../../examples/basic"),
 	}
 
 	want := map[string][]string{
 		"nodejs-npm": {
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/docs/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/web/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/eslint-config-custom/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/tsconfig/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/ui/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/docs/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/web/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/eslint-config-custom/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/tsconfig/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/ui/package.json")),
 		},
 		"nodejs-berry": {
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/docs/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/web/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/eslint-config-custom/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/tsconfig/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/ui/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/docs/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/web/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/eslint-config-custom/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/tsconfig/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/ui/package.json")),
 		},
 		"nodejs-yarn": {
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/docs/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/apps/web/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/eslint-config-custom/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/tsconfig/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/with-yarn/packages/ui/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/docs/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/apps/web/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/eslint-config-custom/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/tsconfig/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/with-yarn/packages/ui/package.json")),
 		},
 		"nodejs-pnpm": {
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/apps/docs/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/apps/web/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/eslint-config-custom/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/tsconfig/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/ui/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/apps/docs/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/apps/web/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/eslint-config-custom/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/tsconfig/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/ui/package.json")),
 		},
 		"nodejs-pnpm6": {
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/apps/docs/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/apps/web/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/eslint-config-custom/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/tsconfig/package.json")),
-			filepath.ToSlash(filepath.Join(cwd, "../../../examples/basic/packages/ui/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/apps/docs/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/apps/web/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/eslint-config-custom/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/tsconfig/package.json")),
+			filepath.ToSlash(filepath.Join(cwd, "../../examples/basic/packages/ui/package.json")),
 		},
 	}
 
@@ -287,8 +283,7 @@ func Test_GetWorkspaces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWorkspaces, err := tt.pm.GetWorkspaces(tt.rootPath)
-
+			gotWorkspaces, err := tt.pm.GetWorkspaces(tt.rootPath, false)
 			gotToSlash := make([]string, len(gotWorkspaces))
 			for index, workspace := range gotWorkspaces {
 				gotToSlash[index] = filepath.ToSlash(workspace)
@@ -315,10 +310,8 @@ func Test_GetWorkspaceIgnores(t *testing.T) {
 		wantErr  bool
 	}
 
-	cwdRaw, err := os.Getwd()
+	cwd, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := GetCwd(cwdRaw)
-	assert.NilError(t, err, "GetCwd")
 	want := map[string][]string{
 		"nodejs-npm":   {"**/node_modules/**"},
 		"nodejs-berry": {"**/node_modules", "**/.git", "**/.yarn"},
@@ -372,10 +365,8 @@ func Test_CanPrune(t *testing.T) {
 		wantErr bool
 	}
 
-	cwdRaw, err := os.Getwd()
+	cwd, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := GetCwd(cwdRaw)
-	assert.NilError(t, err, "GetCwd")
 	wants := map[string]want{
 		"nodejs-npm":   {true, false},
 		"nodejs-berry": {false, true},
@@ -389,7 +380,7 @@ func Test_CanPrune(t *testing.T) {
 		tests[i] = test{
 			name:     packageManager.Name,
 			pm:       packageManager,
-			rootPath: filepath.Join(cwd, "../../../examples/with-yarn"),
+			rootPath: filepath.Join(cwd, "../../examples/with-yarn"),
 			want:     wants[packageManager.Name].want,
 			wantErr:  wants[packageManager.Name].wantErr,
 		}
