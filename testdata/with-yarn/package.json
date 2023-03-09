@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "eslint-config-custom": "*",
+    "eslint": "7.32.0",
+    "prettier": "^2.5.1",
+    "turbo": "latest"
+  },
+  "packageManager": "yarn@1.22.17"
+}
