@@ -3,8 +3,7 @@ package packagemanager
 import (
 	"path/filepath"
 
-	"github.com/vercel/turbo/cli/internal/doublestar"
-	"github.com/vercel/turbo/cli/internal/turbopath"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // PackageType represents the mode in which turbo is running.
@@ -17,7 +16,7 @@ const (
 	Multi PackageType = "multi"
 )
 
-func candidateDirectoryWorkspaceGlobs(directory turbopath.AbsoluteSystemPath) []string {
+func candidateDirectoryWorkspaceGlobs(directory string) []string {
 	packageManagers := []PackageManager{
 		nodejsNpm,
 		nodejsPnpm,
@@ -36,10 +35,10 @@ func candidateDirectoryWorkspaceGlobs(directory turbopath.AbsoluteSystemPath) []
 	return nil
 }
 
-func isOneOfTheWorkspaces(globs []string, nearestPackageJSONDir turbopath.AbsoluteSystemPath, currentPackageJSONDir turbopath.AbsoluteSystemPath) bool {
+func isOneOfTheWorkspaces(globs []string, nearestPackageJSONDir string, currentPackageJSONDir string) bool {
 	for _, glob := range globs {
-		globpattern := currentPackageJSONDir.UntypedJoin(filepath.FromSlash(glob)).ToString()
-		match, _ := doublestar.PathMatch(globpattern, nearestPackageJSONDir.ToString())
+		globpattern := filepath.Join(currentPackageJSONDir, filepath.FromSlash(glob))
+		match, _ := doublestar.PathMatch(globpattern, nearestPackageJSONDir)
 		if match {
 			return true
 		}
@@ -50,7 +49,7 @@ func isOneOfTheWorkspaces(globs []string, nearestPackageJSONDir turbopath.Absolu
 
 // InferRoot identifies which directory we should treat as the root, and which mode
 // turbo should be in when operating at that directory.
-func InferRoot(directory turbopath.AbsoluteSystemPath) (turbopath.AbsoluteSystemPath, PackageType) {
+func InferRoot(directory string) (string, PackageType) {
 	// Go doesn't have iterators, so this is very not-elegant.
 
 	// Scenarios:
@@ -67,12 +66,12 @@ func InferRoot(directory turbopath.AbsoluteSystemPath) (turbopath.AbsoluteSystem
 	//       i. If we are one of the workspaces, directory + multi. (This could be changed in the future.)
 	//       ii. If we're not one of the workspaces, nearestPackageJson + single.
 
-	nearestTurboJSON, findTurboJSONErr := directory.Findup("turbo.json")
+	nearestTurboJSON, findTurboJSONErr := FindupFrom("turbo.json", directory)
 	if nearestTurboJSON == "" || findTurboJSONErr != nil {
 		// We didn't find a turbo.json. We're in situation 2 or 3.
 
 		// Unroll the first loop for Scenario 2
-		nearestPackageJSON, nearestPackageJSONErr := directory.Findup("package.json")
+		nearestPackageJSON, nearestPackageJSONErr := FindupFrom("package.json", directory)
 
 		// If we fail to find any package.json files we aren't in single package mode.
 		// We let things go through our existing failure paths.
@@ -84,7 +83,7 @@ func InferRoot(directory turbopath.AbsoluteSystemPath) (turbopath.AbsoluteSystem
 		// If we find a package.json which has workspaces we aren't in single package mode.
 		// We let things go through our existing failure paths.
 		// Scenario 2B.
-		if candidateDirectoryWorkspaceGlobs(nearestPackageJSON.Dir()) != nil {
+		if candidateDirectoryWorkspaceGlobs(filepath.Dir(nearestPackageJSON)) != nil {
 			// In a future world we could maybe change this behavior.
 			// return nearestPackageJson.Dir(), Multi
 			return directory, Multi
@@ -94,22 +93,22 @@ func InferRoot(directory turbopath.AbsoluteSystemPath) (turbopath.AbsoluteSystem
 		// Find the nearest package.json that has workspaces.
 		// If found _and_ the nearestPackageJson is one of the workspaces, thatPackageJson + multi.
 		// Else, nearestPackageJson + single
-		cursor := nearestPackageJSON.Dir().UntypedJoin("..")
+		cursor := filepath.Join(filepath.Dir(nearestPackageJSON), "..")
 		for {
-			nextPackageJSON, nextPackageJSONErr := cursor.Findup("package.json")
+			nextPackageJSON, nextPackageJSONErr := FindupFrom("package.json", cursor)
 			if nextPackageJSON == "" || nextPackageJSONErr != nil {
 				// We haven't found a parent defining workspaces.
 				// So we're single package mode at nearestPackageJson.
 				// Scenario 3A.
-				return nearestPackageJSON.Dir(), Single
+				return filepath.Dir(nearestPackageJSON), Single
 			}
 
 			// Found a package.json file, see if it has workspaces.
 			// Workspaces are not allowed to be recursive, so we know what to
 			// return the moment we find something with workspaces.
-			globs := candidateDirectoryWorkspaceGlobs(nextPackageJSON.Dir())
+			globs := candidateDirectoryWorkspaceGlobs(filepath.Dir(nextPackageJSON))
 			if globs != nil {
-				if isOneOfTheWorkspaces(globs, nearestPackageJSON.Dir(), nextPackageJSON.Dir()) {
+				if isOneOfTheWorkspaces(globs, filepath.Dir(nearestPackageJSON), filepath.Dir(nextPackageJSON)) {
 					// If it has workspaces, and nearestPackageJson is one of them, we're multi.
 					// We don't infer in this scenario.
 					// Scenario 3BI.
@@ -120,27 +119,27 @@ func InferRoot(directory turbopath.AbsoluteSystemPath) (turbopath.AbsoluteSystem
 				// We found a parent with workspaces, but we're not one of them.
 				// We choose to operate in single package mode.
 				// Scenario 3BII
-				return nearestPackageJSON.Dir(), Single
+				return filepath.Dir(nearestPackageJSON), Single
 			}
 
 			// Loop around and see if we have another parent.
-			cursor = nextPackageJSON.Dir().UntypedJoin("..")
+			cursor = filepath.Join(filepath.Dir(nextPackageJSON), "..")
 		}
 	} else {
 		// If there is no sibling package.json we do no inference.
-		siblingPackageJSONPath := nearestTurboJSON.Dir().UntypedJoin("package.json")
-		if !siblingPackageJSONPath.Exists() {
+		siblingPackageJSONPath := filepath.Join(filepath.Dir(nearestTurboJSON), "package.json")
+		if !PathExists(siblingPackageJSONPath) {
 			// We do no inference.
 			// Scenario 0
 			return directory, Multi
 		}
 
-		if candidateDirectoryWorkspaceGlobs(nearestTurboJSON.Dir()) != nil {
+		if candidateDirectoryWorkspaceGlobs(filepath.Dir(nearestTurboJSON)) != nil {
 			// Scenario 1A.
-			return nearestTurboJSON.Dir(), Multi
+			return filepath.Dir(nearestTurboJSON), Multi
 		}
 
 		// Scenario 1B.
-		return nearestTurboJSON.Dir(), Single
+		return filepath.Dir(nearestTurboJSON), Single
 	}
 }

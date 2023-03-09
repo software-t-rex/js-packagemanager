@@ -2,13 +2,13 @@ package packagemanager
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"github.com/vercel/turbo/cli/internal/fs"
-	"github.com/vercel/turbo/cli/internal/lockfile"
-	"github.com/vercel/turbo/cli/internal/turbopath"
-	"github.com/vercel/turbo/cli/internal/yaml"
+	"github.com/software-t-rex/monospace/packageJson"
+	"sigs.k8s.io/yaml"
 )
 
 // PnpmWorkspaces is a representation of workspace package globs found
@@ -17,8 +17,8 @@ type PnpmWorkspaces struct {
 	Packages []string `yaml:"packages,omitempty"`
 }
 
-func readPnpmWorkspacePackages(workspaceFile turbopath.AbsoluteSystemPath) ([]string, error) {
-	bytes, err := workspaceFile.ReadFile()
+func readPnpmWorkspacePackages(workspaceFile string) ([]string, error) {
+	bytes, err := os.ReadFile(workspaceFile)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", workspaceFile, err)
 	}
@@ -29,8 +29,8 @@ func readPnpmWorkspacePackages(workspaceFile turbopath.AbsoluteSystemPath) ([]st
 	return pnpmWorkspaces.Packages, nil
 }
 
-func getPnpmWorkspaceGlobs(rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
-	pkgGlobs, err := readPnpmWorkspacePackages(rootpath.UntypedJoin("pnpm-workspace.yaml"))
+func getPnpmWorkspaceGlobs(rootpath string) ([]string, error) {
+	pkgGlobs, err := readPnpmWorkspacePackages(filepath.Join(rootpath, "pnpm-workspace.yaml"))
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func getPnpmWorkspaceGlobs(rootpath turbopath.AbsoluteSystemPath) ([]string, err
 	return filteredPkgGlobs, nil
 }
 
-func getPnpmWorkspaceIgnores(pm PackageManager, rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
+func getPnpmWorkspaceIgnores(pm PackageManager, rootpath string) ([]string, error) {
 	// Matches upstream values:
 	// function: https://github.com/pnpm/pnpm/blob/d99daa902442e0c8ab945143ebaf5cdc691a91eb/packages/find-packages/src/index.ts#L27
 	// key code: https://github.com/pnpm/pnpm/blob/d99daa902442e0c8ab945143ebaf5cdc691a91eb/packages/find-packages/src/index.ts#L30
@@ -57,7 +57,7 @@ func getPnpmWorkspaceIgnores(pm PackageManager, rootpath turbopath.AbsoluteSyste
 		"**/node_modules/**",
 		"**/bower_components/**",
 	}
-	pkgGlobs, err := readPnpmWorkspacePackages(rootpath.UntypedJoin("pnpm-workspace.yaml"))
+	pkgGlobs, err := readPnpmWorkspacePackages(filepath.Join(rootpath, "pnpm-workspace.yaml"))
 	if err != nil {
 		return nil, err
 	}
@@ -106,50 +106,51 @@ var nodejsPnpm = PackageManager{
 		return c.Check(v), nil
 	},
 
-	detect: func(projectDirectory turbopath.AbsoluteSystemPath, packageManager *PackageManager) (bool, error) {
-		specfileExists := projectDirectory.UntypedJoin(packageManager.Specfile).FileExists()
-		lockfileExists := projectDirectory.UntypedJoin(packageManager.Lockfile).FileExists()
+	detect: func(projectDirectory string, packageManager *PackageManager) (bool, error) {
+		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
+		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
 		return (specfileExists && lockfileExists), nil
 	},
 
-	canPrune: func(cwd turbopath.AbsoluteSystemPath) (bool, error) {
+	canPrune: func(cwd string) (bool, error) {
 		return true, nil
 	},
 
-	UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
-		return lockfile.DecodePnpmLockfile(contents)
-	},
+	// @FIXME unsuported lockfile
+	// UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
+	// 	return lockfile.DecodeNpmLockfile(contents)
+	// },
 
-	prunePatches: func(pkgJSON *fs.PackageJSON, patches []turbopath.AnchoredUnixPath) error {
+	prunePatches: func(pkgJSON *packageJson.PackageJSON, patches []string) error {
 		return pnpmPrunePatches(pkgJSON, patches)
 	},
 }
 
-func pnpmPrunePatches(pkgJSON *fs.PackageJSON, patches []turbopath.AnchoredUnixPath) error {
+func pnpmPrunePatches(pkgJSON *packageJson.PackageJSON, patches []string) error {
 	pkgJSON.Mu.Lock()
 	defer pkgJSON.Mu.Unlock()
 
 	keysToDelete := []string{}
-	pnpmConfig, ok := pkgJSON.RawJSON["pnpm"].(map[string]interface{})
+	pnpmConfig, ok := pkgJSON.Pnpm.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("Invalid structure for pnpm field in package.json")
+		return fmt.Errorf("invalid structure for pnpm field in package.json")
 	}
 	patchedDependencies, ok := pnpmConfig["patchedDependencies"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("Invalid structure for patchedDependencies field in package.json")
+		return fmt.Errorf("invalid structure for patchedDependencies field in package.json")
 	}
 
 	for dependency, untypedPatch := range patchedDependencies {
 		patch, ok := untypedPatch.(string)
 		if !ok {
-			return fmt.Errorf("Expected only strings in patchedDependencies. Got %v", untypedPatch)
+			return fmt.Errorf("expected only strings in patchedDependencies. Got %v", untypedPatch)
 		}
 
 		inPatches := false
 
 		for _, wantedPatch := range patches {
-			if wantedPatch.ToString() == patch {
+			if wantedPatch == patch {
 				inPatches = true
 				break
 			}

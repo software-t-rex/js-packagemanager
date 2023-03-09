@@ -1,16 +1,14 @@
 package packagemanager
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"github.com/pkg/errors"
-	"github.com/vercel/turbo/cli/internal/fs"
-	"github.com/vercel/turbo/cli/internal/lockfile"
-	"github.com/vercel/turbo/cli/internal/turbopath"
-	"github.com/vercel/turbo/cli/internal/util"
+	"github.com/software-t-rex/monospace/packageJson"
 )
 
 var nodejsBerry = PackageManager{
@@ -21,8 +19,8 @@ var nodejsBerry = PackageManager{
 	Lockfile:   "yarn.lock",
 	PackageDir: "node_modules",
 
-	getWorkspaceGlobs: func(rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
-		pkg, err := fs.ReadPackageJSON(rootpath.UntypedJoin("package.json"))
+	getWorkspaceGlobs: func(rootpath string) ([]string, error) {
+		pkg, err := packageJson.Read(filepath.Join(rootpath, "package.json"))
 		if err != nil {
 			return nil, fmt.Errorf("package.json: %w", err)
 		}
@@ -32,7 +30,7 @@ var nodejsBerry = PackageManager{
 		return pkg.Workspaces, nil
 	},
 
-	getWorkspaceIgnores: func(pm PackageManager, rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
+	getWorkspaceIgnores: func(pm PackageManager, rootpath string) ([]string, error) {
 		// Matches upstream values:
 		// Key code: https://github.com/yarnpkg/berry/blob/8e0c4b897b0881878a1f901230ea49b7c8113fbe/packages/yarnpkg-core/sources/Workspace.ts#L64-L70
 		return []string{
@@ -42,9 +40,9 @@ var nodejsBerry = PackageManager{
 		}, nil
 	},
 
-	canPrune: func(cwd turbopath.AbsoluteSystemPath) (bool, error) {
-		if isNMLinker, err := util.IsNMLinker(cwd.ToStringDuringMigration()); err != nil {
-			return false, errors.Wrap(err, "could not determine if yarn is using `nodeLinker: node-modules`")
+	canPrune: func(cwd string) (bool, error) {
+		if isNMLinker, err := IsNMLinker(cwd); err != nil {
+			return false, errors.New("could not determine if yarn is using `nodeLinker: node-modules`: " + err.Error())
 		} else if !isNMLinker {
 			return false, errors.New("only yarn v2/v3 with `nodeLinker: node-modules` is supported at this time")
 		}
@@ -72,9 +70,9 @@ var nodejsBerry = PackageManager{
 
 	// Detect for berry needs to identify which version of yarn is running on the system.
 	// Further, berry can be configured in an incompatible way, so we check for compatibility here as well.
-	detect: func(projectDirectory turbopath.AbsoluteSystemPath, packageManager *PackageManager) (bool, error) {
-		specfileExists := projectDirectory.UntypedJoin(packageManager.Specfile).FileExists()
-		lockfileExists := projectDirectory.UntypedJoin(packageManager.Lockfile).FileExists()
+	detect: func(projectDirectory string, packageManager *PackageManager) (bool, error) {
+		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
+		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
 		// Short-circuit, definitely not Yarn.
 		if !specfileExists || !lockfileExists {
@@ -82,7 +80,7 @@ var nodejsBerry = PackageManager{
 		}
 
 		cmd := exec.Command("yarn", "--version")
-		cmd.Dir = projectDirectory.ToString()
+		cmd.Dir = projectDirectory
 		out, err := cmd.Output()
 		if err != nil {
 			return false, fmt.Errorf("could not detect yarn version: %w", err)
@@ -99,7 +97,7 @@ var nodejsBerry = PackageManager{
 		// We're Berry!
 
 		// Check for supported configuration.
-		isNMLinker, err := util.IsNMLinker(projectDirectory.ToStringDuringMigration())
+		isNMLinker, err := IsNMLinker(projectDirectory)
 
 		if err != nil {
 			// Failed to read the linker state, so we treat an unknown configuration as a failure.
@@ -113,29 +111,29 @@ var nodejsBerry = PackageManager{
 		return true, nil
 	},
 
-	UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
-		return lockfile.DecodeBerryLockfile(contents)
-	},
+	// UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
+	// 	return lockfile.DecodeBerryLockfile(contents)
+	// },
 
-	prunePatches: func(pkgJSON *fs.PackageJSON, patches []turbopath.AnchoredUnixPath) error {
+	prunePatches: func(pkgJSON *packageJson.PackageJSON, patches []string) error {
 		pkgJSON.Mu.Lock()
 		defer pkgJSON.Mu.Unlock()
 
 		keysToDelete := []string{}
-		resolutions, ok := pkgJSON.RawJSON["resolutions"].(map[string]interface{})
+		resolutions, ok := pkgJSON.Resolutions.(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("Invalid structure for resolutions field in package.json")
+			return fmt.Errorf("invalid structure for resolutions field in package.json")
 		}
 
 		for dependency, untypedPatch := range resolutions {
 			inPatches := false
 			patch, ok := untypedPatch.(string)
 			if !ok {
-				return fmt.Errorf("Expected value of %s in package.json to be a string, got %v", dependency, untypedPatch)
+				return fmt.Errorf("expected value of %s in package.json to be a string, got %v", dependency, untypedPatch)
 			}
 
 			for _, wantedPatch := range patches {
-				if strings.HasSuffix(patch, wantedPatch.ToString()) {
+				if strings.HasSuffix(patch, wantedPatch) {
 					inPatches = true
 					break
 				}

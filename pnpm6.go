@@ -2,10 +2,9 @@ package packagemanager
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/Masterminds/semver"
-	"github.com/vercel/turbo/cli/internal/lockfile"
-	"github.com/vercel/turbo/cli/internal/turbopath"
 )
 
 // Pnpm6Workspaces is a representation of workspace package globs found
@@ -45,18 +44,20 @@ var nodejsPnpm6 = PackageManager{
 		return c.Check(v), nil
 	},
 
-	detect: func(projectDirectory turbopath.AbsoluteSystemPath, packageManager *PackageManager) (bool, error) {
-		specfileExists := projectDirectory.UntypedJoin(packageManager.Specfile).FileExists()
-		lockfileExists := projectDirectory.UntypedJoin(packageManager.Lockfile).FileExists()
+	detect: func(projectDirectory string, packageManager *PackageManager) (bool, error) {
+		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
+		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
 		return (specfileExists && lockfileExists), nil
 	},
 
-	canPrune: func(cwd turbopath.AbsoluteSystemPath) (bool, error) {
+	canPrune: func(cwd string) (bool, error) {
 		return true, nil
 	},
 
-	UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
-		return lockfile.DecodePnpmLockfile(contents)
-	},
+	// @FIXME unsuported lockfile
+	// UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
+	// 	return lockfile.DecodeNpmLockfile(contents)
+	// },
+
 }

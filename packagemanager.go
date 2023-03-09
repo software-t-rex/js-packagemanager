@@ -5,17 +5,15 @@
 package packagemanager
 
 import (
-	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/vercel/turbo/cli/internal/fs"
-	"github.com/vercel/turbo/cli/internal/globby"
-	"github.com/vercel/turbo/cli/internal/lockfile"
-	"github.com/vercel/turbo/cli/internal/turbopath"
-	"github.com/vercel/turbo/cli/internal/util"
+	"github.com/bmatcuk/doublestar/v4"
+	"github.com/software-t-rex/monospace/packageJson"
+	"sigs.k8s.io/yaml"
 )
 
 // PackageManager is an abstraction across package managers
@@ -46,25 +44,26 @@ type PackageManager struct {
 	ArgSeparator []string
 
 	// Return the list of workspace glob
-	getWorkspaceGlobs func(rootpath turbopath.AbsoluteSystemPath) ([]string, error)
+	getWorkspaceGlobs func(rootpath string) ([]string, error)
 
 	// Return the list of workspace ignore globs
-	getWorkspaceIgnores func(pm PackageManager, rootpath turbopath.AbsoluteSystemPath) ([]string, error)
+	getWorkspaceIgnores func(pm PackageManager, rootpath string) ([]string, error)
 
 	// Detect if Turbo knows how to produce a pruned workspace for the project
-	canPrune func(cwd turbopath.AbsoluteSystemPath) (bool, error)
+	canPrune func(cwd string) (bool, error)
 
 	// Test a manager and version tuple to see if it is the Package Manager.
 	Matches func(manager string, version string) (bool, error)
 
 	// Detect if the project is using the Package Manager by inspecting the system.
-	detect func(projectDirectory turbopath.AbsoluteSystemPath, packageManager *PackageManager) (bool, error)
+	detect func(projectDirectory string, packageManager *PackageManager) (bool, error)
 
+	// @FIXME missing Lockfile support
 	// Read a lockfile for a given package manager
-	UnmarshalLockfile func(contents []byte) (lockfile.Lockfile, error)
+	// UnmarshalLockfile func(contents []byte) (lockfile.Lockfile, error)
 
 	// Prune the given pkgJSON to only include references to the given patches
-	prunePatches func(pkgJSON *fs.PackageJSON, patches []turbopath.AnchoredUnixPath) error
+	prunePatches func(pkgJSON *packageJson.PackageJSON, patches []string) error
 }
 
 var packageManagers = []PackageManager{
@@ -84,14 +83,14 @@ var (
 func ParsePackageManagerString(packageManager string) (manager string, version string, err error) {
 	match := packageManagerRegex.FindString(packageManager)
 	if len(match) == 0 {
-		return "", "", fmt.Errorf("We could not parse packageManager field in package.json, expected: %s, received: %s", packageManagerPattern, packageManager)
+		return "", "", fmt.Errorf("we could not parse packageManager field in package.json, expected: %s, received: %s", packageManagerPattern, packageManager)
 	}
 
 	return strings.Split(match, "@")[0], strings.Split(match, "@")[1], nil
 }
 
 // GetPackageManager attempts all methods for identifying the package manager in use.
-func GetPackageManager(projectDirectory turbopath.AbsoluteSystemPath, pkg *fs.PackageJSON) (packageManager *PackageManager, err error) {
+func GetPackageManager(projectDirectory string, pkg *packageJson.PackageJSON) (packageManager *PackageManager, err error) {
 	result, _ := readPackageManager(pkg)
 	if result != nil {
 		return result, nil
@@ -101,7 +100,7 @@ func GetPackageManager(projectDirectory turbopath.AbsoluteSystemPath, pkg *fs.Pa
 }
 
 // readPackageManager attempts to read the package manager from the package.json.
-func readPackageManager(pkg *fs.PackageJSON) (packageManager *PackageManager, err error) {
+func readPackageManager(pkg *packageJson.PackageJSON) (packageManager *PackageManager, err error) {
 	if pkg.PackageManager != "" {
 		manager, version, err := ParsePackageManagerString(pkg.PackageManager)
 		if err != nil {
@@ -116,11 +115,11 @@ func readPackageManager(pkg *fs.PackageJSON) (packageManager *PackageManager, er
 		}
 	}
 
-	return nil, errors.New(util.Sprintf("We did not find a package manager specified in your root package.json. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo."))
+	return nil, fmt.Errorf("we did not find a package manager specified in your root package.json. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo")
 }
 
 // detectPackageManager attempts to detect the package manager by inspecting the project directory state.
-func detectPackageManager(projectDirectory turbopath.AbsoluteSystemPath) (packageManager *PackageManager, err error) {
+func detectPackageManager(projectDirectory string) (packageManager *PackageManager, err error) {
 	for _, packageManager := range packageManagers {
 		isResponsible, err := packageManager.detect(projectDirectory, &packageManager)
 		if err != nil {
@@ -131,11 +130,11 @@ func detectPackageManager(projectDirectory turbopath.AbsoluteSystemPath) (packag
 		}
 	}
 
-	return nil, errors.New(util.Sprintf("We did not detect an in-use package manager for your project. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo."))
+	return nil, fmt.Errorf("we did not detect an in-use package manager for your project. Please set the \"packageManager\" property in your root package.json (${UNDERLINE}https://nodejs.org/api/packages.html#packagemanager)${RESET} or run `npx @turbo/codemod add-package-manager` in the root of your monorepo")
 }
 
 // GetWorkspaces returns the list of package.json files for the current repository.
-func (pm PackageManager) GetWorkspaces(rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
+func (pm PackageManager) GetWorkspaces(rootpath string) ([]string, error) {
 	globs, err := pm.getWorkspaceGlobs(rootpath)
 	if err != nil {
 		return nil, err
@@ -151,43 +150,151 @@ func (pm PackageManager) GetWorkspaces(rootpath turbopath.AbsoluteSystemPath) ([
 		return nil, err
 	}
 
-	f, err := globby.GlobFiles(rootpath.ToStringDuringMigration(), justJsons, ignores)
-	if err != nil {
-		return nil, err
+	// f, err := globby.GlobFiles(rootpath, justJsons, ignores)
+	fs := os.DirFS(rootpath)
+	var res []string
+	for _, glob := range justJsons {
+		founds, err := doublestar.Glob(fs, glob)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, founds...)
+	}
+	for _, glob := range ignores {
+		for i, path := range res {
+			match, err := doublestar.Match(path, glob)
+			if err != nil {
+				return nil, err
+			}
+			if match {
+				res = append(res[:i], res[i+1:]...)
+			}
+		}
 	}
 
-	return f, nil
+	return res, nil
 }
 
 // GetWorkspaceIgnores returns an array of globs not to search for workspaces.
-func (pm PackageManager) GetWorkspaceIgnores(rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
+func (pm PackageManager) GetWorkspaceIgnores(rootpath string) ([]string, error) {
 	return pm.getWorkspaceIgnores(pm, rootpath)
 }
 
 // CanPrune returns if turbo can produce a pruned workspace. Can error if fs issues occur
-func (pm PackageManager) CanPrune(projectDirectory turbopath.AbsoluteSystemPath) (bool, error) {
+func (pm PackageManager) CanPrune(projectDirectory string) (bool, error) {
 	if pm.canPrune != nil {
 		return pm.canPrune(projectDirectory)
 	}
 	return false, nil
 }
 
+// @FIXME missing lockfile support
 // ReadLockfile will read the applicable lockfile into memory
-func (pm PackageManager) ReadLockfile(projectDirectory turbopath.AbsoluteSystemPath) (lockfile.Lockfile, error) {
-	if pm.UnmarshalLockfile == nil {
-		return nil, nil
-	}
-	contents, err := projectDirectory.UntypedJoin(pm.Lockfile).ReadFile()
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", pm.Lockfile, err)
-	}
-	return pm.UnmarshalLockfile(contents)
-}
+// func (pm PackageManager) ReadLockfile(projectDirectory string) (lockfile.Lockfile, error) {
+// 	if pm.UnmarshalLockfile == nil {
+// 		return nil, nil
+// 	}
+// 	contents, err := os.ReadFile(filepath.Join(projectDirectory, pm.Lockfile))
+// 	if err != nil {
+// 		return nil, fmt.Errorf("reading %s: %w", pm.Lockfile, err)
+// 	}
+// 	return pm.UnmarshalLockfile(contents)
+// }
 
 // PrunePatchedPackages will alter the provided pkgJSON to only reference the provided patches
-func (pm PackageManager) PrunePatchedPackages(pkgJSON *fs.PackageJSON, patches []turbopath.AnchoredUnixPath) error {
+func (pm PackageManager) PrunePatchedPackages(pkgJSON *packageJson.PackageJSON, patches []string) error {
 	if pm.prunePatches != nil {
 		return pm.prunePatches(pkgJSON, patches)
 	}
 	return nil
+}
+
+// YarnRC Represents contents of .yarnrc.yml
+type YarnRC struct {
+	NodeLinker string `yaml:"nodeLinker"`
+}
+
+// IsNMLinker Checks that Yarn is set to use the node-modules linker style
+func IsNMLinker(cwd string) (bool, error) {
+	yarnRC := &YarnRC{}
+
+	bytes, err := os.ReadFile(filepath.Join(cwd, ".yarnrc.yml"))
+	if err != nil {
+		return false, fmt.Errorf(".yarnrc.yml: %w", err)
+	}
+
+	if yaml.Unmarshal(bytes, yarnRC) != nil {
+		return false, fmt.Errorf(".yarnrc.yml: %w", err)
+	}
+
+	return yarnRC.NodeLinker == "node-modules", nil
+}
+
+func FileExists(path string) bool {
+	info, err := os.Lstat(path)
+	return err == nil && !info.IsDir()
+}
+
+func PathExists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
+func hasFile(name, dir string) (bool, error) {
+	files, err := os.ReadDir(dir)
+
+	if err != nil {
+		return false, err
+	}
+
+	for _, f := range files {
+		if name == f.Name() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func FindupFrom(name, dir string) (string, error) {
+	for {
+		found, err := hasFile(name, dir)
+
+		if err != nil {
+			return "", err
+		}
+
+		if found {
+			return filepath.Join(dir, name), nil
+		}
+
+		parent := filepath.Dir(dir)
+
+		if parent == dir {
+			return "", nil
+		}
+
+		dir = parent
+	}
+}
+
+// GetCwd returns the calculated working directory after traversing symlinks.
+func GetCwd(cwdRaw string) (string, error) {
+	if cwdRaw == "" {
+		var err error
+		cwdRaw, err = os.Getwd()
+		if err != nil {
+			return "", err
+		}
+	}
+	// We evaluate symlinks here because the package managers
+	// we support do the same.
+	cwdRaw, err := filepath.EvalSymlinks(cwdRaw)
+	if err != nil {
+		return "", fmt.Errorf("evaluating symlinks in cwd: %w", err)
+	}
+	if !filepath.IsAbs(cwdRaw) {
+		return "", fmt.Errorf("cwd is not an absolute path %v: %v", cwdRaw, err)
+	}
+	return cwdRaw, nil
 }

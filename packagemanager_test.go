@@ -7,8 +7,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/vercel/turbo/cli/internal/fs"
-	"github.com/vercel/turbo/cli/internal/turbopath"
+	"github.com/software-t-rex/monospace/packageJson"
+
 	"gotest.tools/v3/assert"
 )
 
@@ -104,47 +104,47 @@ func TestParsePackageManagerString(t *testing.T) {
 func TestGetPackageManager(t *testing.T) {
 	cwdRaw, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := fs.GetCwd(cwdRaw)
+	cwd, err := GetCwd(cwdRaw)
 	assert.NilError(t, err, "GetCwd")
 	tests := []struct {
 		name             string
-		projectDirectory turbopath.AbsoluteSystemPath
-		pkg              *fs.PackageJSON
+		projectDirectory string
+		pkg              *packageJson.PackageJSON
 		want             string
 		wantErr          bool
 	}{
 		{
 			name:             "finds npm from a package manager string",
 			projectDirectory: cwd,
-			pkg:              &fs.PackageJSON{PackageManager: "npm@1.2.3"},
+			pkg:              &packageJson.PackageJSON{PackageManager: "npm@1.2.3"},
 			want:             "nodejs-npm",
 			wantErr:          false,
 		},
 		{
 			name:             "finds pnpm6 from a package manager string",
 			projectDirectory: cwd,
-			pkg:              &fs.PackageJSON{PackageManager: "pnpm@1.2.3"},
+			pkg:              &packageJson.PackageJSON{PackageManager: "pnpm@1.2.3"},
 			want:             "nodejs-pnpm6",
 			wantErr:          false,
 		},
 		{
 			name:             "finds pnpm from a package manager string",
 			projectDirectory: cwd,
-			pkg:              &fs.PackageJSON{PackageManager: "pnpm@7.8.9"},
+			pkg:              &packageJson.PackageJSON{PackageManager: "pnpm@7.8.9"},
 			want:             "nodejs-pnpm",
 			wantErr:          false,
 		},
 		{
 			name:             "finds yarn from a package manager string",
 			projectDirectory: cwd,
-			pkg:              &fs.PackageJSON{PackageManager: "yarn@1.2.3"},
+			pkg:              &packageJson.PackageJSON{PackageManager: "yarn@1.2.3"},
 			want:             "nodejs-yarn",
 			wantErr:          false,
 		},
 		{
 			name:             "finds berry from a package manager string",
 			projectDirectory: cwd,
-			pkg:              &fs.PackageJSON{PackageManager: "yarn@2.3.4"},
+			pkg:              &packageJson.PackageJSON{PackageManager: "yarn@2.3.4"},
 			want:             "nodejs-berry",
 			wantErr:          false,
 		},
@@ -166,37 +166,37 @@ func TestGetPackageManager(t *testing.T) {
 func Test_readPackageManager(t *testing.T) {
 	tests := []struct {
 		name    string
-		pkg     *fs.PackageJSON
+		pkg     *packageJson.PackageJSON
 		want    string
 		wantErr bool
 	}{
 		{
 			name:    "finds npm from a package manager string",
-			pkg:     &fs.PackageJSON{PackageManager: "npm@1.2.3"},
+			pkg:     &packageJson.PackageJSON{PackageManager: "npm@1.2.3"},
 			want:    "nodejs-npm",
 			wantErr: false,
 		},
 		{
 			name:    "finds pnpm6 from a package manager string",
-			pkg:     &fs.PackageJSON{PackageManager: "pnpm@1.2.3"},
+			pkg:     &packageJson.PackageJSON{PackageManager: "pnpm@1.2.3"},
 			want:    "nodejs-pnpm6",
 			wantErr: false,
 		},
 		{
 			name:    "finds pnpm from a package manager string",
-			pkg:     &fs.PackageJSON{PackageManager: "pnpm@7.8.9"},
+			pkg:     &packageJson.PackageJSON{PackageManager: "pnpm@7.8.9"},
 			want:    "nodejs-pnpm",
 			wantErr: false,
 		},
 		{
 			name:    "finds yarn from a package manager string",
-			pkg:     &fs.PackageJSON{PackageManager: "yarn@1.2.3"},
+			pkg:     &packageJson.PackageJSON{PackageManager: "yarn@1.2.3"},
 			want:    "nodejs-yarn",
 			wantErr: false,
 		},
 		{
 			name:    "finds berry from a package manager string",
-			pkg:     &fs.PackageJSON{PackageManager: "yarn@2.3.4"},
+			pkg:     &packageJson.PackageJSON{PackageManager: "yarn@2.3.4"},
 			want:    "nodejs-berry",
 			wantErr: false,
 		},
@@ -219,21 +219,21 @@ func Test_GetWorkspaces(t *testing.T) {
 	type test struct {
 		name     string
 		pm       PackageManager
-		rootPath turbopath.AbsoluteSystemPath
+		rootPath string
 		want     []string
 		wantErr  bool
 	}
 
 	cwd, _ := os.Getwd()
 
-	repoRoot, err := fs.GetCwd(cwd)
+	repoRoot, err := GetCwd(cwd)
 	assert.NilError(t, err, "GetCwd")
-	rootPath := map[string]turbopath.AbsoluteSystemPath{
-		"nodejs-npm":   repoRoot.UntypedJoin("../../../examples/with-yarn"),
-		"nodejs-berry": repoRoot.UntypedJoin("../../../examples/with-yarn"),
-		"nodejs-yarn":  repoRoot.UntypedJoin("../../../examples/with-yarn"),
-		"nodejs-pnpm":  repoRoot.UntypedJoin("../../../examples/basic"),
-		"nodejs-pnpm6": repoRoot.UntypedJoin("../../../examples/basic"),
+	rootPath := map[string]string{
+		"nodejs-npm":   filepath.Join(repoRoot, "../../../examples/with-yarn"),
+		"nodejs-berry": filepath.Join(repoRoot, "../../../examples/with-yarn"),
+		"nodejs-yarn":  filepath.Join(repoRoot, "../../../examples/with-yarn"),
+		"nodejs-pnpm":  filepath.Join(repoRoot, "../../../examples/basic"),
+		"nodejs-pnpm6": filepath.Join(repoRoot, "../../../examples/basic"),
 	}
 
 	want := map[string][]string{
@@ -310,14 +310,14 @@ func Test_GetWorkspaceIgnores(t *testing.T) {
 	type test struct {
 		name     string
 		pm       PackageManager
-		rootPath turbopath.AbsoluteSystemPath
+		rootPath string
 		want     []string
 		wantErr  bool
 	}
 
 	cwdRaw, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := fs.GetCwd(cwdRaw)
+	cwd, err := GetCwd(cwdRaw)
 	assert.NilError(t, err, "GetCwd")
 	want := map[string][]string{
 		"nodejs-npm":   {"**/node_modules/**"},
@@ -332,7 +332,7 @@ func Test_GetWorkspaceIgnores(t *testing.T) {
 		tests[i] = test{
 			name:     packageManager.Name,
 			pm:       packageManager,
-			rootPath: cwd.UntypedJoin("fixtures"),
+			rootPath: filepath.Join(cwd, "fixtures"),
 			want:     want[packageManager.Name],
 			wantErr:  false,
 		}
@@ -362,7 +362,7 @@ func Test_CanPrune(t *testing.T) {
 	type test struct {
 		name     string
 		pm       PackageManager
-		rootPath turbopath.AbsoluteSystemPath
+		rootPath string
 		want     bool
 		wantErr  bool
 	}
@@ -374,7 +374,7 @@ func Test_CanPrune(t *testing.T) {
 
 	cwdRaw, err := os.Getwd()
 	assert.NilError(t, err, "os.Getwd")
-	cwd, err := fs.GetCwd(cwdRaw)
+	cwd, err := GetCwd(cwdRaw)
 	assert.NilError(t, err, "GetCwd")
 	wants := map[string]want{
 		"nodejs-npm":   {true, false},
@@ -389,7 +389,7 @@ func Test_CanPrune(t *testing.T) {
 		tests[i] = test{
 			name:     packageManager.Name,
 			pm:       packageManager,
-			rootPath: cwd.UntypedJoin("../../../examples/with-yarn"),
+			rootPath: filepath.Join(cwd, "../../../examples/with-yarn"),
 			want:     wants[packageManager.Name].want,
 			wantErr:  wants[packageManager.Name].wantErr,
 		}

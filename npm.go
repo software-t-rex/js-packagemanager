@@ -2,10 +2,9 @@ package packagemanager
 
 import (
 	"fmt"
+	"path/filepath"
 
-	"github.com/vercel/turbo/cli/internal/fs"
-	"github.com/vercel/turbo/cli/internal/lockfile"
-	"github.com/vercel/turbo/cli/internal/turbopath"
+	"github.com/software-t-rex/monospace/packageJson"
 )
 
 var nodejsNpm = PackageManager{
@@ -17,8 +16,8 @@ var nodejsNpm = PackageManager{
 	PackageDir:   "node_modules",
 	ArgSeparator: []string{"--"},
 
-	getWorkspaceGlobs: func(rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
-		pkg, err := fs.ReadPackageJSON(rootpath.UntypedJoin("package.json"))
+	getWorkspaceGlobs: func(rootpath string) ([]string, error) {
+		pkg, err := packageJson.Read(filepath.Join(rootpath, "package.json"))
 		if err != nil {
 			return nil, fmt.Errorf("package.json: %w", err)
 		}
@@ -28,7 +27,7 @@ var nodejsNpm = PackageManager{
 		return pkg.Workspaces, nil
 	},
 
-	getWorkspaceIgnores: func(pm PackageManager, rootpath turbopath.AbsoluteSystemPath) ([]string, error) {
+	getWorkspaceIgnores: func(pm PackageManager, rootpath string) ([]string, error) {
 		// Matches upstream values:
 		// function: https://github.com/npm/map-workspaces/blob/a46503543982cb35f51cc2d6253d4dcc6bca9b32/lib/index.js#L73
 		// key code: https://github.com/npm/map-workspaces/blob/a46503543982cb35f51cc2d6253d4dcc6bca9b32/lib/index.js#L90-L96
@@ -42,18 +41,19 @@ var nodejsNpm = PackageManager{
 		return manager == "npm", nil
 	},
 
-	detect: func(projectDirectory turbopath.AbsoluteSystemPath, packageManager *PackageManager) (bool, error) {
-		specfileExists := projectDirectory.UntypedJoin(packageManager.Specfile).FileExists()
-		lockfileExists := projectDirectory.UntypedJoin(packageManager.Lockfile).FileExists()
+	detect: func(projectDirectory string, packageManager *PackageManager) (bool, error) {
+		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
+		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
 		return (specfileExists && lockfileExists), nil
 	},
 
-	canPrune: func(cwd turbopath.AbsoluteSystemPath) (bool, error) {
+	canPrune: func(cwd string) (bool, error) {
 		return true, nil
 	},
 
-	UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
-		return lockfile.DecodeNpmLockfile(contents)
-	},
+	// @FIXME unsuported lockfile
+	// UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
+	// 	return lockfile.DecodeNpmLockfile(contents)
+	// },
 }
