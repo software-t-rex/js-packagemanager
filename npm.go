@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/software-t-rex/monospace/packageJson"
+	"github.com/software-t-rex/packageJson"
 )
 
 var nodejsNpm = PackageManager{

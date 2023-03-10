@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"github.com/software-t-rex/monospace/packageJson"
+	"github.com/software-t-rex/packageJson"
 	"sigs.k8s.io/yaml"
 )
 

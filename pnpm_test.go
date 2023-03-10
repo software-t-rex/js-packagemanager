@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/software-t-rex/monospace/packageJson"
+	"github.com/software-t-rex/packageJson"
 	"gotest.tools/v3/assert"
 )
 

@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/software-t-rex/monospace/packageJson"
+	"github.com/software-t-rex/packageJson"
 )
 
 // PackageManager is an abstraction across package managers
