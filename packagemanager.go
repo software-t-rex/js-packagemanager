@@ -96,7 +96,7 @@ func ParsePackageManagerString(packageManager string) (manager string, version s
 
 // GetPackageManager attempts all methods for identifying the package manager in use.
 func GetPackageManager(projectDirectory string, pkg *packageJson.PackageJSON) (packageManager *PackageManager, err error) {
-	result, _ := readPackageManager(pkg)
+	result, _ := GetPackageManagerFromString(pkg.PackageManager)
 	if result != nil {
 		return result, nil
 	}
@@ -104,23 +104,21 @@ func GetPackageManager(projectDirectory string, pkg *packageJson.PackageJSON) (p
 	return detectPackageManager(projectDirectory)
 }
 
-// readPackageManager attempts to read the package manager from the package.json.
-func readPackageManager(pkg *packageJson.PackageJSON) (packageManager *PackageManager, err error) {
-	if pkg.PackageManager != "" {
-		manager, version, err := ParsePackageManagerString(pkg.PackageManager)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, packageManager := range packageManagers {
-			isResponsible, err := packageManager.Matches(manager, version)
-			if isResponsible && (err == nil) {
-				return &packageManager, nil
-			}
+func GetPackageManagerFromString(packageManagerStr string) (packageManager *PackageManager, err error) {
+	if packageManagerStr == "" {
+		return nil, fmt.Errorf("no package manager specified")
+	}
+	manager, version, err := ParsePackageManagerString(packageManagerStr)
+	if err != nil {
+		return nil, err
+	}
+	for _, packageManager := range packageManagers {
+		isResponsible, err := packageManager.Matches(manager, version)
+		if isResponsible && (err == nil) {
+			return &packageManager, nil
 		}
 	}
-
-	return nil, fmt.Errorf("we did not find a package manager specified in your root package.json. Please set the \"packageManager\" property in your root package.json (https://nodejs.org/api/packages.html#packagemanager)")
+	return nil, fmt.Errorf("we didn't find a matching package manager for '%s'", packageManagerStr)
 }
 
 // detectPackageManager attempts to detect the package manager by inspecting the project directory state.

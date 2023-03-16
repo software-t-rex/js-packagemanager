@@ -161,47 +161,47 @@ func TestGetPackageManager(t *testing.T) {
 	}
 }
 
-func Test_readPackageManager(t *testing.T) {
+func Test_GetPackageManagerFromString(t *testing.T) {
 	tests := []struct {
-		name    string
-		pkg     *packageJson.PackageJSON
-		want    string
-		wantErr bool
+		name       string
+		pkgMngrStr string
+		want       string
+		wantErr    bool
 	}{
 		{
-			name:    "finds npm from a package manager string",
-			pkg:     &packageJson.PackageJSON{PackageManager: "npm@1.2.3"},
-			want:    "nodejs-npm",
-			wantErr: false,
+			name:       "finds npm from a package manager string",
+			pkgMngrStr: "npm@1.2.3",
+			want:       "nodejs-npm",
+			wantErr:    false,
 		},
 		{
-			name:    "finds pnpm6 from a package manager string",
-			pkg:     &packageJson.PackageJSON{PackageManager: "pnpm@1.2.3"},
-			want:    "nodejs-pnpm6",
-			wantErr: false,
+			name:       "finds pnpm6 from a package manager string",
+			pkgMngrStr: "pnpm@1.2.3",
+			want:       "nodejs-pnpm6",
+			wantErr:    false,
 		},
 		{
-			name:    "finds pnpm from a package manager string",
-			pkg:     &packageJson.PackageJSON{PackageManager: "pnpm@7.8.9"},
-			want:    "nodejs-pnpm",
-			wantErr: false,
+			name:       "finds pnpm from a package manager string",
+			pkgMngrStr: "pnpm@7.8.9",
+			want:       "nodejs-pnpm",
+			wantErr:    false,
 		},
 		{
-			name:    "finds yarn from a package manager string",
-			pkg:     &packageJson.PackageJSON{PackageManager: "yarn@1.2.3"},
-			want:    "nodejs-yarn",
-			wantErr: false,
+			name:       "finds yarn from a package manager string",
+			pkgMngrStr: "yarn@1.2.3",
+			want:       "nodejs-yarn",
+			wantErr:    false,
 		},
 		{
-			name:    "finds berry from a package manager string",
-			pkg:     &packageJson.PackageJSON{PackageManager: "yarn@2.3.4"},
-			want:    "nodejs-berry",
-			wantErr: false,
+			name:       "finds berry from a package manager string",
+			pkgMngrStr: "yarn@2.3.4",
+			want:       "nodejs-berry",
+			wantErr:    false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPackageManager, err := readPackageManager(tt.pkg)
+			gotPackageManager, err := GetPackageManagerFromString(tt.pkgMngrStr)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readPackageManager() error = %v, wantErr %v", err, tt.wantErr)
 				return
