@@ -8,7 +8,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/software-t-rex/packageJson"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // PnpmWorkspaces is a representation of workspace package globs found

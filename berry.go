@@ -10,7 +10,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/software-t-rex/packageJson"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // isNMLinker Checks that Yarn is set to use the node-modules linker style
