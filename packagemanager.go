@@ -13,6 +13,7 @@ package packagemanager
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -101,7 +102,7 @@ func GetPackageManager(projectDirectory string, pkg *packageJson.PackageJSON) (p
 		return result, nil
 	}
 
-	return detectPackageManager(projectDirectory)
+	return DetectPackageManager(projectDirectory)
 }
 
 func GetPackageManagerFromString(packageManagerStr string) (packageManager *PackageManager, err error) {
@@ -122,7 +123,7 @@ func GetPackageManagerFromString(packageManagerStr string) (packageManager *Pack
 }
 
 // detectPackageManager attempts to detect the package manager by inspecting the project directory state.
-func detectPackageManager(projectDirectory string) (packageManager *PackageManager, err error) {
+func DetectPackageManager(projectDirectory string) (packageManager *PackageManager, err error) {
 	for _, packageManager := range packageManagers {
 		isResponsible, err := packageManager.detect(projectDirectory, &packageManager)
 		if err != nil {
@@ -217,6 +218,15 @@ func (pm PackageManager) PrunePatchedPackages(pkgJSON *packageJson.PackageJSON, 
 		return pm.prunePatches(pkgJSON, patches)
 	}
 	return nil
+}
+
+func (pm PackageManager) GetVersion() (string, error) {
+	cmd := exec.Command(pm.Command, "--version")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("could not detect %s version: %w", pm.Name, err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // YarnRC Represents contents of .yarnrc.yml
