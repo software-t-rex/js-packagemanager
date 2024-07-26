@@ -229,6 +229,12 @@ func (pm PackageManager) GetVersion() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// Same as GetVersion but remove any +suffix
+func (pm PackageManager) GetStandardVersion() (string, error) {
+	version, error := pm.GetVersion()
+	return strings.Split(version, "+")[0], error
+}
+
 // YarnRC Represents contents of .yarnrc.yml
 type YarnRC struct {
 	NodeLinker string `yaml:"nodeLinker"`
