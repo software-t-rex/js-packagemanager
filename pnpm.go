@@ -69,8 +69,8 @@ func getPnpmWorkspaceIgnores(pm PackageManager, rootpath string) ([]string, erro
 	return ignores, nil
 }
 
-var nodejsPnpm = PackageManager{
-	Name:       "nodejs-pnpm",
+var pnpm = PackageManager{
+	Name:       "pnpm",
 	Slug:       "pnpm",
 	Command:    "pnpm",
 	Specfile:   "package.json",
@@ -110,7 +110,32 @@ var nodejsPnpm = PackageManager{
 		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
 		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
-		return (specfileExists && lockfileExists), nil
+		if !(specfileExists && lockfileExists) {
+			return false, nil
+		}
+
+		// If pnpm is not installed, we can't determine the version
+		// In this case, default to modern pnpm (better assumption than pnpm6)
+		if !packageManager.IsInstalled() {
+			return true, nil // Default to modern pnpm when not installed
+		}
+
+		version, err := packageManager.GetStandardVersion()
+		if err != nil {
+			return true, nil // If we can't get version, default to modern pnpm
+		}
+
+		// Use the same logic as Matches to determine if this is pnpm (>=7.0.0)
+		v, err := semver.NewVersion(version)
+		if err != nil {
+			return true, nil // If version parsing fails, default to modern pnpm
+		}
+		c, err := semver.NewConstraint(">=7.0.0")
+		if err != nil {
+			return true, nil // If constraint creation fails, default to modern pnpm
+		}
+
+		return c.Check(v), nil
 	},
 
 	canPrune: func(cwd string) (bool, error) {

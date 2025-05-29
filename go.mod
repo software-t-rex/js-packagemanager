@@ -1,6 +1,6 @@
 module github.com/software-t-rex/js-packagemanager
 
-go 1.20
+go 1.23
 
 replace github.com/software-t-rex/packageJson => ../packageJson
 

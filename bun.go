@@ -7,12 +7,12 @@ import (
 	"github.com/software-t-rex/packageJson"
 )
 
-var npm = PackageManager{
-	Name:         "npm",
-	Slug:         "npm",
-	Command:      "npm",
+var bun = PackageManager{
+	Name:         "bun",
+	Slug:         "bun",
+	Command:      "bun",
 	Specfile:     "package.json",
-	Lockfile:     "package-lock.json",
+	Lockfile:     "bun.lockb",
 	PackageDir:   "node_modules",
 	ArgSeparator: []string{"--"},
 
@@ -22,23 +22,20 @@ var npm = PackageManager{
 			return nil, fmt.Errorf("package.json: %w", err)
 		}
 		if len(pkg.Workspaces) == 0 {
-			return nil, fmt.Errorf("package.json: no workspaces found. packagemanager requires npm workspaces to be defined in the root package.json")
+			return nil, fmt.Errorf("package.json: no workspaces found. packagemanager requires Bun workspaces to be defined in the root package.json")
 		}
 		return pkg.Workspaces, nil
 	},
 
 	getWorkspaceIgnores: func(pm PackageManager, rootpath string) ([]string, error) {
-		// Matches upstream values:
-		// function: https://github.com/npm/map-workspaces/blob/a46503543982cb35f51cc2d6253d4dcc6bca9b32/lib/index.js#L73
-		// key code: https://github.com/npm/map-workspaces/blob/a46503543982cb35f51cc2d6253d4dcc6bca9b32/lib/index.js#L90-L96
-		// call site: https://github.com/npm/cli/blob/7a858277171813b37d46a032e49db44c8624f78f/lib/workspaces/get-workspaces.js#L14
+		// Bun follows similar patterns to npm for workspace ignores
 		return []string{
 			"**/node_modules/**",
 		}, nil
 	},
 
 	Matches: func(manager string, version string) (bool, error) {
-		return manager == "npm", nil
+		return manager == "bun", nil
 	},
 
 	detect: func(projectDirectory string, packageManager *PackageManager) (bool, error) {
@@ -52,8 +49,9 @@ var npm = PackageManager{
 		return true, nil
 	},
 
-	// @FIXME unsuported lockfile
-	// UnmarshalLockfile: func(contents []byte) (lockfile.Lockfile, error) {
-	// 	return lockfile.DecodeNpmLockfile(contents)
-	// },
+	prunePatches: func(pkgJSON *packageJson.PackageJSON, patches []string) error {
+		// Bun doesn't have built-in patch support like pnpm, but we can implement
+		// basic patch pruning if needed in the future
+		return nil
+	},
 }

@@ -13,8 +13,8 @@ type Pnpm6Workspaces struct {
 	Packages []string `yaml:"packages,omitempty"`
 }
 
-var nodejsPnpm6 = PackageManager{
-	Name:                       "nodejs-pnpm6",
+var pnpm6 = PackageManager{
+	Name:                       "pnpm6",
 	Slug:                       "pnpm",
 	Command:                    "pnpm",
 	Specfile:                   "package.json",
@@ -48,7 +48,32 @@ var nodejsPnpm6 = PackageManager{
 		specfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Specfile))
 		lockfileExists := FileExists(filepath.Join(projectDirectory, packageManager.Lockfile))
 
-		return (specfileExists && lockfileExists), nil
+		if !(specfileExists && lockfileExists) {
+			return false, nil
+		}
+
+		// If pnpm is not installed, we can't determine the version
+		// In this case, let pnpm handle the detection (modern default)
+		if !packageManager.IsInstalled() {
+			return false, nil
+		}
+
+		version, err := packageManager.GetStandardVersion()
+		if err != nil {
+			return false, nil // If we can't get version, let pnpm handle it
+		}
+
+		// Use the same logic as Matches to determine if this is pnpm6
+		v, err := semver.NewVersion(version)
+		if err != nil {
+			return false, nil
+		}
+		c, err := semver.NewConstraint("<7.0.0")
+		if err != nil {
+			return false, nil
+		}
+
+		return c.Check(v), nil
 	},
 
 	canPrune: func(cwd string) (bool, error) {

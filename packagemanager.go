@@ -13,7 +13,6 @@ package packagemanager
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -64,6 +63,12 @@ type PackageManager struct {
 	// Detect if the project is using the Package Manager by inspecting the system.
 	detect func(projectDirectory string, packageManager *PackageManager) (bool, error)
 
+	// Custom GetVersion function for package managers that need special version parsing
+	getVersion func() (string, error)
+
+	// Custom GetStandardVersion function for package managers that need special version parsing
+	getStandardVersion func() (string, error)
+
 	// @FIXME missing Lockfile support
 	// Read a lockfile for a given package manager
 	// UnmarshalLockfile func(contents []byte) (lockfile.Lockfile, error)
@@ -72,16 +77,24 @@ type PackageManager struct {
 	prunePatches func(pkgJSON *packageJson.PackageJSON, patches []string) error
 }
 
+// PackageManagerResult represents the result of detecting a package manager string
+type PackageManagerResult struct {
+	PackageManagerString string
+	VersionSource        string
+}
+
 var packageManagers = []PackageManager{
-	nodejsYarn,
-	nodejsBerry,
-	nodejsNpm,
-	nodejsPnpm,
-	nodejsPnpm6,
+	yarn,
+	berry,
+	npm,
+	pnpm,
+	pnpm6,
+	bun,
+	deno,
 }
 
 var (
-	packageManagerPattern = `(npm|pnpm|yarn)@(\d+)\.\d+\.\d+(-.+)?`
+	packageManagerPattern = `(npm|pnpm|yarn|bun|deno)@(\d+)\.\d+\.\d+(-.+)?`
 	packageManagerRegex   = regexp.MustCompile(packageManagerPattern)
 )
 
@@ -134,7 +147,12 @@ func DetectPackageManager(projectDirectory string) (packageManager *PackageManag
 		}
 	}
 
-	return nil, fmt.Errorf("we did not detect an in-use package manager for your project. Please set the \"packageManager\" property in your root package.json (https://nodejs.org/api/packages.html#packagemanager)")
+	return nil, fmt.Errorf("we did not detect an in-use package manager for your project.\nPlease set the \"packageManager\" property in your root package.json (https://nodejs.org/api/packages.html#packagemanager)")
+}
+
+// GetAllPackageManagers returns all available package managers
+func GetAllPackageManagers() []PackageManager {
+	return packageManagers
 }
 
 // GetWorkspaces returns the list of package.json files for the current mono[space|repo].
@@ -221,7 +239,10 @@ func (pm PackageManager) PrunePatchedPackages(pkgJSON *packageJson.PackageJSON, 
 }
 
 func (pm PackageManager) GetVersion() (string, error) {
-	cmd := exec.Command(pm.Command, "--version")
+	if pm.getVersion != nil {
+		return pm.getVersion()
+	}
+	cmd := CrossPlatformUtils.CreateCommand("", pm.Command, "--version")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("could not detect %s version: %w", pm.Name, err)
@@ -231,8 +252,98 @@ func (pm PackageManager) GetVersion() (string, error) {
 
 // Same as GetVersion but remove any +suffix
 func (pm PackageManager) GetStandardVersion() (string, error) {
+	if pm.getStandardVersion != nil {
+		return pm.getStandardVersion()
+	}
 	version, error := pm.GetVersion()
 	return strings.Split(version, "+")[0], error
+}
+
+// GetEffectiveSpecFile returns the actual spec file to use for this package manager in the given directory
+func (pm PackageManager) GetEffectiveSpecFile(projectDirectory string) string {
+	// Special handling for Deno which can use either deno.json or package.json
+	if pm.Slug == "deno" {
+		denoJsonPath := filepath.Join(projectDirectory, "deno.json")
+		if FileExists(denoJsonPath) {
+			return "deno.json"
+		}
+		return "package.json"
+	}
+	return pm.Specfile
+}
+
+// IsInstalled checks if the package manager is available on the system
+func (pm PackageManager) IsInstalled() bool {
+	return CrossPlatformUtils.IsExecutableAvailable(pm.Command)
+}
+
+// GetInstallationPath returns the path to the package manager executable
+func (pm PackageManager) GetInstallationPath() (string, error) {
+	return CrossPlatformUtils.FindExecutable(pm.Command)
+}
+
+// ValidateProject performs basic validation checks on a project
+func (pm PackageManager) ValidateProject(projectDirectory string) []string {
+	var issues []string
+
+	// Check if spec file exists
+	specFile := pm.GetEffectiveSpecFile(projectDirectory)
+	specPath := filepath.Join(projectDirectory, specFile)
+	if !FileExists(specPath) {
+		issues = append(issues, fmt.Sprintf("Spec file %s not found", specFile))
+	}
+
+	// Check if lock file exists
+	lockPath := filepath.Join(projectDirectory, pm.Lockfile)
+	if !FileExists(lockPath) {
+		issues = append(issues, fmt.Sprintf("Lock file %s not found", pm.Lockfile))
+	}
+
+	// Check if package manager is installed
+	if !pm.IsInstalled() {
+		issues = append(issues, fmt.Sprintf("Package manager %s is not installed", pm.Name))
+	}
+
+	// Check if package directory exists (node_modules, etc.)
+	pkgDirPath := filepath.Join(projectDirectory, pm.PackageDir)
+	if !PathExists(pkgDirPath) {
+		issues = append(issues, fmt.Sprintf("Package directory %s not found (run install first)", pm.PackageDir))
+	}
+
+	return issues
+}
+
+// DetectPackageManagerString returns the package manager string suitable for package.json
+// and indicates the source of the version information
+func (pm PackageManager) DetectPackageManagerString(projectDirectory string, pkg *packageJson.PackageJSON) (*PackageManagerResult, error) {
+	var packageManagerString string
+	var versionSource string
+
+	// Check if packageManager field exists in package.json and has version
+	if pkg.PackageManager != "" {
+		if name, version, err := ParsePackageManagerString(pkg.PackageManager); err == nil && name == pm.Slug && version != "" {
+			packageManagerString = pkg.PackageManager
+			versionSource = "package.json"
+		}
+	}
+
+	// If no version from package.json, try to get from installed version
+	if packageManagerString == "" {
+		standardVersion, err := pm.GetStandardVersion()
+		if err != nil {
+			// If we can't get a version, just return the package manager name
+			packageManagerString = pm.Slug
+			versionSource = "none"
+		} else {
+			packageManagerString = fmt.Sprintf("%s@%s", pm.Slug, standardVersion)
+			versionSource = "installed"
+		}
+	}
+
+	return &PackageManagerResult{
+		PackageManagerString: packageManagerString,
+		VersionSource:        versionSource,
+	}, nil
 }
 
 // YarnRC Represents contents of .yarnrc.yml

@@ -29,8 +29,8 @@ func isNMLinker(cwd string) (bool, error) {
 	return yarnRC.NodeLinker == "node-modules", nil
 }
 
-var nodejsBerry = PackageManager{
-	Name:       "nodejs-berry",
+var berry = PackageManager{
+	Name:       "berry",
 	Slug:       "yarn",
 	Command:    "yarn",
 	Specfile:   "package.json",

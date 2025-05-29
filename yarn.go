@@ -10,8 +10,8 @@ import (
 	"github.com/software-t-rex/packageJson"
 )
 
-var nodejsYarn = PackageManager{
-	Name:         "nodejs-yarn",
+var yarn = PackageManager{
+	Name:         "yarn",
 	Slug:         "yarn",
 	Command:      "yarn",
 	Specfile:     "package.json",

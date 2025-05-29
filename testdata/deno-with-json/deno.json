@@ -1,0 +1,9 @@
+{
+  "workspaces": ["apps/*", "packages/*"],
+  "tasks": {
+    "start": "deno run --allow-net --allow-read main.ts"
+  },
+  "imports": {
+    "@std/": "https://deno.land/std@0.208.0/"
+  }
+}
